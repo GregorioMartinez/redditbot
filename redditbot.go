@@ -95,7 +95,6 @@ func main() {
 					log.Printf("Adding %s to commented list \n", id)
 					log.Printf("%d spots remaining", limit-len(commented))
 					commented = append(commented, id)
-					sort.Strings(commented)
 				} else {
 					log.Println("Clearing commented list")
 					commented = make([]string, 0, 1)
