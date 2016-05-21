@@ -14,17 +14,6 @@ import (
 	"time"
 )
 
-func init() {
-	file, err := os.Create("redditbot.log")
-	if err != nil {
-		log.Fatal("Unable to create log file")
-	}
-
-	defer file.Close()
-
-	log.SetOutput(file)
-}
-
 // @TODO Add error handling for everything. instead of just panicing
 // Add posted comment if post successful
 func main() {
