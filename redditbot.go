@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"regexp"
 	"sort"
@@ -109,10 +108,7 @@ func main() {
 
 				if len(commentBody) > 0 {
 
-					commentTitle := wiki.Query.Pages[0].Title
-					commentLink := matches[0]
-
-					commentLink = replaceUrl.Replace(commentLink)
+					commentTitle, commentLink := wiki.Query.Pages[0].Title, replaceUrl.Replace(matches[0])
 
 					comment := fmt.Sprintf("**[%s](%s)** \n\n ---  \n\n >%s \n\n --- \n\n %s", commentTitle, commentLink, commentBody, commentInfo)
 

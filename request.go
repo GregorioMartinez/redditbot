@@ -1,5 +1,13 @@
 package main
 
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+)
+
 func searchNew(client *http.Client, params map[string]interface{}) Listing {
 
 	resp := request(client, "GET", "/r/all/personalbotplayground.json", params)
