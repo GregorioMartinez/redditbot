@@ -16,4 +16,4 @@ RUN go install
 # Copy over blacklists
 RUN cp *.txt /go/bin
 
-ENTRYPOINT /go/bin/redditbot
+ENTRYPOINT /bin/sh
