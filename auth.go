@@ -2,13 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"golang.org/x/oauth2"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
-
-	"golang.org/x/oauth2"
+	"time"
 )
 
 type clientInfo struct {
@@ -33,7 +34,15 @@ func getClient(s string) *http.Client {
 	// First try to Read Token
 	token, err := getTokenFromFile("reddit-token.json")
 	if err != nil {
-		token = getTokenFromWeb(conf)
+		for {
+			token, err = getTokenFromWeb(conf)
+			if err != nil {
+				log.Printf("Error: %s \n. Sleeping for 3 seconds before retrying. \n", err)
+				time.Sleep(3 * time.Second)
+			} else {
+				break
+			}
+		}
 	}
 
 	return conf.Client(oauth2.NoContext, token)
@@ -66,7 +75,7 @@ func saveTokenToFile(filename string, token *oauth2.Token) {
 	}
 }
 
-func getTokenFromWeb(conf *oauth2.Config) *oauth2.Token {
+func getTokenFromWeb(conf *oauth2.Config) (*oauth2.Token, error) {
 	duration := oauth2.SetAuthURLParam("duration", "permanent")
 
 	url := conf.AuthCodeURL("goingtoignorethiskindoffornow", oauth2.AccessTypeOffline, duration)
@@ -79,12 +88,12 @@ func getTokenFromWeb(conf *oauth2.Config) *oauth2.Token {
 
 	token, err := conf.Exchange(oauth2.NoContext, code)
 	if err != nil {
-		panic(err)
+		return nil, errors.New("429")
 	}
 
 	saveTokenToFile("reddit-token.json", token)
 
-	return token
+	return token, nil
 }
 
 func getAuthInfo(filename string) (string, string) {
