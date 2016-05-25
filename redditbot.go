@@ -50,8 +50,6 @@ func main() {
 		// Get new comments from /r/all
 		listings := searchNew(client, searchparams)
 
-		log.Printf("Getting new batch of %d comments", limit)
-
 		for _, listing := range listings.Data.Children {
 
 			if listing.Data.Author == "WikipediaPoster" {
