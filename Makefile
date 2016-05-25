@@ -6,4 +6,4 @@ build:
 # Creates a container
 # Runs a command
 create:
-	docker run --interactive --tty --entrypoint=/bin/bash --env-file reddit-wikipediaposter.env  $(NAME) -i
+	docker run --interactive --tty --env-file reddit-wikipediaposter.env --entrypoint=/bin/bash $(NAME) -i
