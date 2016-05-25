@@ -10,7 +10,7 @@ import (
 
 func searchNew(client *http.Client, params map[string]interface{}) Listing {
 
-	resp := request(client, "GET", "/r/all/personalbotplayground.json", params)
+	resp, _ := request(client, "GET", "/r/personalbotplayground/comments.json", params)
 
 	var listings Listing
 	json.Unmarshal(resp, &listings)
@@ -22,7 +22,7 @@ func postNewComment(client *http.Client, params map[string]interface{}) {
 	request(client, "POST", "/api/comment", params)
 }
 
-func request(client *http.Client, method string, path string, params map[string]interface{}) []byte {
+func request(client *http.Client, method string, path string, params map[string]interface{}) ([]byte, error) {
 
 	values := make(url.Values)
 	for k, v := range params {
@@ -33,14 +33,14 @@ func request(client *http.Client, method string, path string, params map[string]
 
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	req.Header.Set("User-Agent", "User-Agent: wikipediaposterbot:v0.0.1 (by /u/WikipediaPoster)")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	defer resp.Body.Close()
@@ -50,5 +50,5 @@ func request(client *http.Client, method string, path string, params map[string]
 		panic(err)
 	}
 
-	return body
+	return body, nil
 }
