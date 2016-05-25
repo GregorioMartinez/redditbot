@@ -37,9 +37,7 @@ func main() {
 	searchparams := make(map[string]interface{})
 	searchparams["limit"] = limit
 
-	commentInfo := fmt.Sprint("^Created ^by ^[/u/GregMartinez](https://www.reddit.com/user/GregMartinez)")
-
-	commentInfo = ""
+	commentInfo := fmt.Sprint("^I ^am ^a ^bot. ^Please ^contact ^[/u/GregMartinez](https://www.reddit.com/user/GregMartinez) ^with ^any ^questions ^or ^feedback.")
 
 	commented := make([]string, 0, limit)
 
