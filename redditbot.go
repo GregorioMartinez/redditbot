@@ -12,7 +12,9 @@ import (
 	"strings"
 	"time"
 )
-
+// @TODO Delete comment if -1
+// @TODO "you are doing that too much. try again in 4 minutes." - Check limits on posting
+// @TODO Put limit on length of reply
 // @TODO Add error handling for everything. instead of just panicing
 // Add posted comment if post successful
 func main() {
