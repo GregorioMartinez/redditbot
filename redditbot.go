@@ -12,9 +12,11 @@ import (
 	"strings"
 	"time"
 )
+
 // @TODO Delete comment if -1
 // @TODO "you are doing that too much. try again in 4 minutes." - Check limits on posting
 // @TODO Put limit on length of reply
+// @TODO Handle sections
 // @TODO Add error handling for everything. instead of just panicing
 // Add posted comment if post successful
 func main() {
@@ -29,7 +31,7 @@ func main() {
 	client := getClient("reddit-wikipediaposter-config.json")
 
 	// RegEx for finding wikipedia links
-	r := regexp.MustCompile(`http(?:s)?://([a-zA-Z]{2}).(?:m\.)?wikipedia.org/wiki/([^\s|#]+)`)
+	r := regexp.MustCompile(`http(?:s)?://([a-zA-Z]{2}).(?:m\.)?wikipedia.org/wiki/([^\s|#]+(?:#(\w+))?)`)
 
 	//Wikipedia API endpoint
 	wikilink := "https://%s.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro&explaintext&formatversion=2&titles=%s"
