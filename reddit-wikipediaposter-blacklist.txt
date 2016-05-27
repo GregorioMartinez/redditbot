@@ -19,3 +19,8 @@ Android
 Futurology
 motorcycles
 MMA
+Parenting
+horror
+Vive
+gadgets
+sysadmin
