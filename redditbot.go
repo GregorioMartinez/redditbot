@@ -94,11 +94,21 @@ func main() {
 
 				commentBody := strings.TrimSpace(wiki.Query.Pages[0].Extract)
 
+				// Format the output
+				commentBody = strings.Replace(commentBody, "\n", "\n\n>", -1)
+
+				// Only want 2 paragraphs
+				paragraphs := strings.Split(commentBody, ">")
+
+				if len(paragraphs) >= 2 {
+					commentBody = fmt.Sprintf("%s >%s", paragraphs[0], paragraphs[1])
+				}
+
 				if len(commentBody) > 0 {
 
 					commentTitle, commentLink := wiki.Query.Pages[0].Title, replaceUrl.Replace(matches[0])
 
-					comment := fmt.Sprintf("**[%s](%s)** \n\n ---  \n\n >%s \n\n --- \n\n %s", commentTitle, commentLink, commentBody, commentInfo)
+					comment := fmt.Sprintf("**[%s](%s)** \n\n ---  \n\n>%s \n\n --- \n\n %s", commentTitle, commentLink, commentBody, commentInfo)
 
 					commentparams := make(map[string]interface{})
 					commentparams["text"] = comment
