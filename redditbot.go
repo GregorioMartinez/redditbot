@@ -10,8 +10,11 @@ import (
 	"net/http"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/kennygrant/sanitize"
 )
 
 func main() {
@@ -51,6 +54,84 @@ func main() {
 			// Extraction actually worked
 			if total > 0 {
 
+				var extract string
+				var title string
+
+				// If we have a section we need to make two api calls
+				if section != "" {
+					// Do additional calls
+					wurl := fmt.Sprintf(`https://%s.wikipedia.org/w/api.php?action=parse&page=%s&prop=sections&format=json&formatversion=2`, lang, query)
+
+					var sectionNum int64
+
+					resp, err := http.Get(wurl)
+					if err != nil {
+						log.Println(err.Error())
+						continue
+					}
+
+					body, err := ioutil.ReadAll(resp.Body)
+					if err != nil {
+						panic(err)
+					}
+
+					var wikiSections WikipediaSectionResponse
+
+					err = json.Unmarshal(body, &wikiSections)
+					if err != nil {
+						panic(err)
+					}
+
+					for _, wikiSection := range wikiSections.Parse.Sections {
+						if wikiSection.Anchor == section {
+							sectionNum, err = strconv.ParseInt(wikiSection.Index, 10, 32)
+							if err != nil {
+								sectionNum = 0
+							}
+							break
+						}
+					}
+
+					if sectionNum == 0 {
+						log.Println("Unable to find matching section")
+						continue
+					}
+
+					surl := fmt.Sprintf(`https://%s.wikipedia.org/w/api.php?action=query&prop=revisions&titles=%s&rvprop=content&rvsection=%d&formatversion=2&rvlimit=1&rvparse&format=json`, lang, query, sectionNum)
+					resp, err = http.Get(surl)
+					if err != nil {
+						log.Println(err.Error())
+						continue
+					}
+
+					body, err = ioutil.ReadAll(resp.Body)
+					if err != nil {
+						panic(err)
+					}
+
+					var wikiRevisionSection WikipediaRevisionResponse
+
+					err = json.Unmarshal(body, &wikiRevisionSection)
+					if err != nil {
+						panic(err)
+					}
+					extract, title = sanitize.HTML(wikiRevisionSection.Query.Pages[0].Revisions[0].Content), wikiRevisionSection.Query.Pages[0].Title
+
+				} else {
+					wiki := wikiData(fmt.Sprintf(wikilink, lang, query))
+					extract, title = wiki.Query.Pages[0].Extract, wiki.Query.Pages[0].Title
+				}
+
+				comment, err := formatComment(extract, title, link)
+				if err != nil {
+					log.Printf("%s", err.Error())
+					continue
+				}
+				commentparams := make(map[string]interface{})
+				commentparams["text"] = comment
+				commentparams["parent"] = id
+				postNewComment(client, commentparams)
+
 				// Store a small cache of comments if we have space
 				if len(commented) < commentLimit {
 					log.Printf("Adding %s to commented list \n", id)
@@ -59,35 +140,16 @@ func main() {
 					commented = make([]string, 0, 1)
 				}
 
-				// If we have a section we need to make two api calls
-				if section != "" {
-					// Do additional calls
-					//https://en.wikipedia.org/w/api.php?action=parse&page=Emphatic_(band)&prop=sections&format=json
-					// wurl := fmt.Sprintf(`http://%s.wikipedia.org/w/api.php?action=parse&page=%s&prop=sections`, lang, query)
-				} else {
-					// Do the one normal API call
-				}
-				wiki := wikiData(fmt.Sprintf(wikilink, lang, query))
-
-				comment, err := formatComment(wiki, link)
-				if err != nil {
-					log.Printf("%s", err.Error())
-					continue
-				}
-
-				commentparams := make(map[string]interface{})
-				commentparams["text"] = comment
-				commentparams["parent"] = id
-				postNewComment(client, commentparams)
 			}
+
 		}
 		time.Sleep(3 * time.Second)
 	}
 }
 
-func formatComment(wiki WikipediaResponse, url string) (string, error) {
+func formatComment(extract string, title string, url string) (string, error) {
 	// Remove whitespace
-	commentBody := strings.TrimSpace(wiki.Query.Pages[0].Extract)
+	commentBody := strings.TrimSpace(extract)
 
 	if len(commentBody) == 0 {
 		return commentBody, errors.New("Empty Comment Body")
@@ -105,7 +167,7 @@ func formatComment(wiki WikipediaResponse, url string) (string, error) {
 
 	// Escape the ()'s found in links
 	replaceUrl := strings.NewReplacer("(", "\\(", ")", "\\)")
-	commentTitle, commentLink := wiki.Query.Pages[0].Title, replaceUrl.Replace(url)
+	commentTitle, commentLink := title, replaceUrl.Replace(url)
 	commentInfo := fmt.Sprint("^I ^am ^a ^bot. ^Please ^contact ^[/u/GregMartinez](https://www.reddit.com/user/GregMartinez) ^with ^any ^questions ^or ^feedback.")
 	comment := fmt.Sprintf("**[%s](%s)** \n\n ---  \n\n>%s \n\n --- \n\n %s", commentTitle, commentLink, commentBody, commentInfo)
 
@@ -137,9 +199,13 @@ func extractWikiLink(url string) (string, string, string, string, int) {
 
 	matches := r.FindStringSubmatch(url)
 
-	link, lang, url, section, total := matches[0], matches[1], matches[2], matches[3], len(matches)
+	if len(matches) > 0 {
+		link, lang, url, section, total := matches[0], matches[1], matches[2], matches[3], len(matches)
+		return link, lang, url, section, total
+	}
 
-	return link, lang, url, section, total
+	return "", "", "", "", 0
+
 }
 
 func wikiData(link string) WikipediaResponse {

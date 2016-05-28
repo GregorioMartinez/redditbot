@@ -9,7 +9,7 @@ import (
 )
 
 func redditSearchNew(client *http.Client, params map[string]interface{}) Listing {
-	resp, _ := request(client, "GET", "/r/all/comments.json", params)
+	resp, _ := request(client, "GET", "/r/personalbotplayground/comments.json", params)
 
 	var listings Listing
 	json.Unmarshal(resp, &listings)
@@ -35,7 +35,7 @@ func request(client *http.Client, method string, path string, params map[string]
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", "User-Agent: wikipediaposterbot:v0.0.2 (by /u/WikipediaPoster)")
+	req.Header.Set("User-Agent", "User-Agent: wikipediaposterbot:v0.0.3 (by /u/WikipediaPoster)")
 
 	resp, err := client.Do(req)
 	if err != nil {
