@@ -1,3 +1,5 @@
+# Add name of bot to blacklisted users
+WikipediaPoster
 DarthRainbows
 AndyBea
 TexMarshfellow

@@ -24,3 +24,7 @@ horror
 Vive
 gadgets
 sysadmin
+personalfinance
+cats
+biology
+beer
