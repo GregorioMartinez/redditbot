@@ -8,8 +8,7 @@ import (
 	"net/url"
 )
 
-func searchNew(client *http.Client, params map[string]interface{}) Listing {
-
+func redditSearchNew(client *http.Client, params map[string]interface{}) Listing {
 	resp, _ := request(client, "GET", "/r/all/comments.json", params)
 
 	var listings Listing

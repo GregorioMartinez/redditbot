@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -13,113 +14,132 @@ import (
 	"time"
 )
 
-// @TODO Delete comment if -1
-// @TODO "you are doing that too much. try again in 4 minutes." - Check limits on posting
-// @TODO Put limit on length of reply
-// @TODO Handle sections
-// @TODO Add error handling for everything. instead of just panicing
-// Add posted comment if post successful
 func main() {
-
 	// Load blacklists
-	blacklist := getBlacklist("reddit-wikipediaposter-blacklist.txt")
-	blacklistUsers := getBlacklist("reddit-wikipediaposter-blacklist-users.txt")
-
-	log.Printf("Blacklisted Subreddits %v. \n Blacklisted users %v", blacklist, blacklistUsers)
+	blacklistSubs, blacklistUsers := getBlacklist("subs.txt"), getBlacklist("users.txt")
 
 	// Get the client for making requests
 	client := getClient("reddit-wikipediaposter-config.json")
 
-	// RegEx for finding wikipedia links
-	r := regexp.MustCompile(`http(?:s)?://([a-zA-Z]{2}).(?:m\.)?wikipedia.org/wiki/([^\s|#]+(?:#(\w+))?)`)
+	// Number of comments to request at once. Max 100
+	commentLimit := 100
+
+	// Used for storing comments already replied to
+	commented := make([]string, 0, commentLimit)
+
+	// Parameters for searching comments on reddit
+	searchparams := make(map[string]interface{})
+	searchparams["limit"] = commentLimit
 
 	//Wikipedia API endpoint
 	wikilink := "https://%s.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro&explaintext&formatversion=2&titles=%s"
 
-	limit := 100
-
-	searchparams := make(map[string]interface{})
-	searchparams["limit"] = limit
-
-	commentInfo := fmt.Sprint("^I ^am ^a ^bot. ^Please ^contact ^[/u/GregMartinez](https://www.reddit.com/user/GregMartinez) ^with ^any ^questions ^or ^feedback.")
-
-	commented := make([]string, 0, limit)
-
-	replaceUrl := strings.NewReplacer("(", "\\(", ")", "\\)")
-
 	// Run
 	for {
 		// Get new comments from /r/all
-		listings := searchNew(client, searchparams)
+		listings := redditSearchNew(client, searchparams)
 
 		for _, listing := range listings.Data.Children {
 
-			if listing.Data.Author == "WikipediaPoster" {
+			poster, sub, id := strings.ToLower(listing.Data.Author), strings.ToLower(listing.Data.Subreddit), listing.Data.Name
+
+			if !canPost(poster, sub, id, blacklistSubs, blacklistUsers, commented) {
 				continue
 			}
 
-			if contains(blacklistUsers, listing.Data.Author) {
-				continue
-			}
+			link, lang, query, section, total := extractWikiLink(listing.Data.Body)
+			// Extraction actually worked
+			if total > 0 {
 
-			sub := strings.ToLower(listing.Data.Subreddit)
-
-			if contains(blacklist, sub) {
-				continue
-			}
-
-			id := listing.Data.Name
-
-			if contains(commented, id) {
-				continue
-			}
-
-			matches := r.FindStringSubmatch(listing.Data.Body)
-			if len(matches) >= 2 {
-				log.Printf("Found wiki link here: %s\n", sub)
-
-				if len(commented) < limit {
+				// Store a small cache of comments if we have space
+				if len(commented) < commentLimit {
 					log.Printf("Adding %s to commented list \n", id)
-					log.Printf("%d spots remaining", limit-len(commented))
 					commented = append(commented, id)
 				} else {
-					log.Println("Clearing commented list")
 					commented = make([]string, 0, 1)
 				}
 
-				lang, query := matches[1], matches[2]
-				endpoint := fmt.Sprintf(wikilink, lang, query)
+				// If we have a section we need to make two api calls
+				if section != "" {
+					// Do additional calls
+					//https://en.wikipedia.org/w/api.php?action=parse&page=Emphatic_(band)&prop=sections&format=json
+					// wurl := fmt.Sprintf(`http://%s.wikipedia.org/w/api.php?action=parse&page=%s&prop=sections`, lang, query)
+				} else {
+					// Do the one normal API call
+				}
+				wiki := wikiData(fmt.Sprintf(wikilink, lang, query))
 
-				wiki := wikiData(endpoint)
-
-				commentBody := strings.TrimSpace(wiki.Query.Pages[0].Extract)
-
-				// Format the output
-				commentBody = strings.Replace(commentBody, "\n", "\n\n>", -1)
-
-				// Only want 2 paragraphs
-				paragraphs := strings.Split(commentBody, ">")
-
-				if len(paragraphs) >= 2 {
-					commentBody = fmt.Sprintf("%s >%s", paragraphs[0], paragraphs[1])
+				comment, err := formatComment(wiki, link)
+				if err != nil {
+					log.Printf("%s", err.Error())
+					continue
 				}
 
-				if len(commentBody) > 0 {
-
-					commentTitle, commentLink := wiki.Query.Pages[0].Title, replaceUrl.Replace(matches[0])
-
-					comment := fmt.Sprintf("**[%s](%s)** \n\n ---  \n\n>%s \n\n --- \n\n %s", commentTitle, commentLink, commentBody, commentInfo)
-
-					commentparams := make(map[string]interface{})
-					commentparams["text"] = comment
-					commentparams["parent"] = id
-
-					postNewComment(client, commentparams)
-				}
+				commentparams := make(map[string]interface{})
+				commentparams["text"] = comment
+				commentparams["parent"] = id
+				postNewComment(client, commentparams)
 			}
 		}
 		time.Sleep(3 * time.Second)
 	}
+}
+
+func formatComment(wiki WikipediaResponse, url string) (string, error) {
+	// Remove whitespace
+	commentBody := strings.TrimSpace(wiki.Query.Pages[0].Extract)
+
+	if len(commentBody) == 0 {
+		return commentBody, errors.New("Empty Comment Body")
+	}
+
+	// Format the output
+	commentBody = strings.Replace(commentBody, "\n", "\n\n>", -1)
+
+	// Only want 2 paragraphs
+	paragraphs := strings.Split(commentBody, ">")
+
+	if len(paragraphs) >= 2 {
+		commentBody = fmt.Sprintf("%s >%s", paragraphs[0], paragraphs[1])
+	}
+
+	// Escape the ()'s found in links
+	replaceUrl := strings.NewReplacer("(", "\\(", ")", "\\)")
+	commentTitle, commentLink := wiki.Query.Pages[0].Title, replaceUrl.Replace(url)
+	commentInfo := fmt.Sprint("^I ^am ^a ^bot. ^Please ^contact ^[/u/GregMartinez](https://www.reddit.com/user/GregMartinez) ^with ^any ^questions ^or ^feedback.")
+	comment := fmt.Sprintf("**[%s](%s)** \n\n ---  \n\n>%s \n\n --- \n\n %s", commentTitle, commentLink, commentBody, commentInfo)
+
+	return comment, nil
+}
+
+func canPost(poster string, sub string, id string, blacklistSubs []string, blacklistUsers []string, commented []string) bool {
+	// Talking to a blacklisted person
+	if contains(blacklistUsers, poster) {
+		return false
+	}
+
+	// Talking in a blacklisted sub
+	if contains(blacklistSubs, sub) {
+		return false
+	}
+
+	// Already comment here
+	if contains(commented, id) {
+		return false
+	}
+
+	return true
+}
+
+func extractWikiLink(url string) (string, string, string, string, int) {
+	// RegEx for finding wikipedia links
+	r := regexp.MustCompile(`http(?:s)?://([a-zA-Z]{2}).(?:m\.)?wikipedia.org/wiki/([^\s|#]+)(?:#(.+))?`)
+
+	matches := r.FindStringSubmatch(url)
+
+	link, lang, url, section, total := matches[0], matches[1], matches[2], matches[3], len(matches)
+
+	return link, lang, url, section, total
 }
 
 func wikiData(link string) WikipediaResponse {
@@ -161,10 +181,7 @@ func getBlacklist(filename string) []string {
 	}
 
 	b := bytes.ToLower(contents)
-
 	s := string(b[:])
 
-	list := strings.Split(s, "\n")
-
-	return list
+	return strings.Split(s, "\n")
 }
