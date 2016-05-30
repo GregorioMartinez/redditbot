@@ -5,3 +5,4 @@ Add ability for parent comment to delete bot response
 Get list of wikipedia links to run tests against
 Update to better logging
 Can you make it so it won't respond to the same article every time it's brought up in a thread?
+Add section name as part of link in comment
