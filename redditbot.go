@@ -50,6 +50,14 @@ func main() {
 				continue
 			}
 
+			// Store a small cache of comments if we have space
+			if len(commented) < commentLimit {
+				log.Printf("Adding %s to commented list \n", id)
+				commented = append(commented, id)
+			} else {
+				commented = make([]string, 0, 1)
+			}
+
 			link, lang, query, section, total := extractWikiLink(listing.Data.Body)
 			// Extraction actually worked
 			if total > 0 {
@@ -93,7 +101,6 @@ func main() {
 					}
 
 					if sectionNum == 0 {
-						log.Println("Unable to find matching section")
 						continue
 					}
 
@@ -115,7 +122,12 @@ func main() {
 					if err != nil {
 						panic(err)
 					}
+
+					r := regexp.MustCompile(`\[.*\]`)
+
 					extract, title = sanitize.HTML(wikiRevisionSection.Query.Pages[0].Revisions[0].Content), wikiRevisionSection.Query.Pages[0].Title
+
+					extract = r.ReplaceAllLiteralString(extract, " ")
 
 				} else {
 					wiki := wikiData(fmt.Sprintf(wikilink, lang, query))
@@ -131,17 +143,7 @@ func main() {
 				commentparams["text"] = comment
 				commentparams["parent"] = id
 				postNewComment(client, commentparams)
-
-				// Store a small cache of comments if we have space
-				if len(commented) < commentLimit {
-					log.Printf("Adding %s to commented list \n", id)
-					commented = append(commented, id)
-				} else {
-					commented = make([]string, 0, 1)
-				}
-
 			}
-
 		}
 		time.Sleep(3 * time.Second)
 	}
