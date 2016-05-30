@@ -9,7 +9,7 @@ import (
 )
 
 func redditSearchNew(client *http.Client, params map[string]interface{}) Listing {
-	resp, _ := request(client, "GET", "/r/personalbotplayground/comments.json", params)
+	resp, _ := request(client, "GET", "/r/all/comments.json", params)
 
 	var listings Listing
 	json.Unmarshal(resp, &listings)
