@@ -2,19 +2,14 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/http"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/kennygrant/sanitize"
 )
 
 func main() {
@@ -103,7 +98,13 @@ func main() {
 				commentparams := make(map[string]interface{})
 				commentparams["text"] = comment
 				commentparams["parent"] = id
-				postNewComment(client, commentparams)
+
+				err = postNewComment(client, commentparams)
+				if err != nil {
+					log.Printf("Error: %s", err.Error())
+					continue
+				}
+
 				log.Printf("Posted comment in /r/%s with parent id: %s \n", sub, id)
 
 				// Store a small cache of comments if we have space

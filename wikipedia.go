@@ -1,5 +1,16 @@
 package main
 
+import (
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
+	"regexp"
+	"strings"
+
+	"github.com/kennygrant/sanitize"
+)
+
 type WikipediaResponse struct {
 	Batchcomplete bool `json:"batchcomplete"`
 	Query         struct {
