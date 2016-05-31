@@ -1,3 +1,4 @@
+Look into double posting issues
 Only reply to the article linked once per thread
 Bot should not reply if there are quotes
 Add ability for parent comment to delete bot response
