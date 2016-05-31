@@ -52,14 +52,13 @@ func main() {
 
 			// Store a small cache of comments if we have space
 			if len(commented) < commentLimit {
-				log.Printf("Adding %s to commented list \n", id)
 				commented = append(commented, id)
 			} else {
 				commented = make([]string, 0, 1)
 			}
 
 			link, lang, query, section, total := extractWikiLink(listing.Data.Body)
-			// Extraction actually worked
+
 			if total > 0 {
 
 				var extract string
@@ -67,28 +66,13 @@ func main() {
 
 				// If we have a section we need to make two api calls
 				if section != "" {
-					// Do additional calls
-					wurl := fmt.Sprintf(`https://%s.wikipedia.org/w/api.php?action=parse&page=%s&prop=sections&format=json&formatversion=2`, lang, query)
 
-					var sectionNum int64
-
-					resp, err := http.Get(wurl)
+					wikiSections, err := wikiGetAllSections(lang, query)
 					if err != nil {
-						log.Println(err.Error())
 						continue
 					}
 
-					body, err := ioutil.ReadAll(resp.Body)
-					if err != nil {
-						panic(err)
-					}
-
-					var wikiSections WikipediaSectionResponse
-
-					err = json.Unmarshal(body, &wikiSections)
-					if err != nil {
-						panic(err)
-					}
+					var sectionNum int64
 
 					for _, wikiSection := range wikiSections.Parse.Sections {
 						if wikiSection.Anchor == section {
@@ -104,30 +88,15 @@ func main() {
 						continue
 					}
 
-					surl := fmt.Sprintf(`https://%s.wikipedia.org/w/api.php?action=query&prop=revisions&titles=%s&rvprop=content&rvsection=%d&formatversion=2&rvlimit=1&rvparse&format=json`, lang, query, sectionNum)
-					resp, err = http.Get(surl)
+					wikiRevisionSection, err := wikiGetSection(lang, query, sectionNum)
 					if err != nil {
-						log.Println(err.Error())
 						continue
 					}
 
-					body, err = ioutil.ReadAll(resp.Body)
-					if err != nil {
-						panic(err)
-					}
+					extract, title = wikiRevisionSection.Query.Pages[0].Revisions[0].Content, wikiRevisionSection.Query.Pages[0].Title
 
-					var wikiRevisionSection WikipediaRevisionResponse
-
-					err = json.Unmarshal(body, &wikiRevisionSection)
-					if err != nil {
-						panic(err)
-					}
-
-					r := regexp.MustCompile(`\[.*\]`)
-
-					extract, title = sanitize.HTML(wikiRevisionSection.Query.Pages[0].Revisions[0].Content), wikiRevisionSection.Query.Pages[0].Title
-
-					extract = r.ReplaceAllLiteralString(extract, " ")
+					// Extract paragraphs.
+					extract = extractWikiSection(extract)
 
 				} else {
 					wiki := wikiData(fmt.Sprintf(wikilink, lang, query))
@@ -136,17 +105,62 @@ func main() {
 
 				comment, err := formatComment(extract, title, link)
 				if err != nil {
-					log.Printf("%s", err.Error())
 					continue
 				}
 				commentparams := make(map[string]interface{})
 				commentparams["text"] = comment
 				commentparams["parent"] = id
 				postNewComment(client, commentparams)
+				log.Printf("Posted comment in /r/%s with parent id: %s \n", sub, id)
 			}
 		}
 		time.Sleep(3 * time.Second)
 	}
+}
+
+func wikiGetSection(lang string, query string, sectionNum int64) (WikipediaRevisionResponse, error) {
+	var wikiRevisionSection WikipediaRevisionResponse
+
+	url := fmt.Sprintf(`https://%s.wikipedia.org/w/api.php?action=query&prop=revisions&titles=%s&rvprop=content&rvsection=%d&formatversion=2&rvlimit=1&rvparse&format=json`, lang, query, sectionNum)
+	resp, err := http.Get(url)
+	if err != nil {
+		return wikiRevisionSection, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return wikiRevisionSection, err
+	}
+
+	err = json.Unmarshal(body, &wikiRevisionSection)
+	if err != nil {
+		return wikiRevisionSection, err
+	}
+
+	return wikiRevisionSection, nil
+}
+
+func wikiGetAllSections(lang string, query string) (WikipediaSectionResponse, error) {
+	var wikiSections WikipediaSectionResponse
+
+	url := fmt.Sprintf(`https://%s.wikipedia.org/w/api.php?action=parse&page=%s&prop=sections&format=json&formatversion=2`, lang, query)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return wikiSections, err
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return wikiSections, err
+	}
+
+	err = json.Unmarshal(body, &wikiSections)
+	if err != nil {
+		return wikiSections, err
+	}
+
+	return wikiSections, nil
 }
 
 func formatComment(extract string, title string, url string) (string, error) {
@@ -193,6 +207,17 @@ func canPost(poster string, sub string, id string, blacklistSubs []string, black
 	}
 
 	return true
+}
+
+func extractWikiSection(s string) string {
+
+	r := regexp.MustCompile(`<p>.+?(?:\n+)?</p>`)
+	tmp := strings.Join(r.FindAllString(s, -1), "")
+
+	re := regexp.MustCompile(`\[.+?\]`)
+	extract := re.ReplaceAllLiteralString(tmp, "")
+
+	return sanitize.HTML(extract)
 }
 
 func extractWikiLink(url string) (string, string, string, string, int) {
