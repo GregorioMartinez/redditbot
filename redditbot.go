@@ -16,6 +16,9 @@ func main() {
 	// Load blacklists
 	blacklistSubs, blacklistUsers := getBlacklist("subs.txt"), getBlacklist("users.txt")
 
+	log.Printf("Blacklistd Subs: %v \n", blacklistSubs)
+	log.Printf("Blacklistd Users: %v \n", blacklistUsers)
+
 	// Get the client for making requests
 	client := getClient("reddit-wikipediaposter-config.json")
 
