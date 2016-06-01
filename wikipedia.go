@@ -12,16 +12,16 @@ import (
 )
 
 type WikipediaResponse struct {
-	Batchcomplete bool `json:"batchcomplete"`
+	Batchcomplete bool `json:"-"`
 	Query         struct {
 		Normalized []struct {
-			From string `json:"from"`
-			To   string `json:"to"`
-		} `json:"normalized"`
+			From string `json:"-"`
+			To   string `json:"-"`
+		} `json:"-"`
 		Pages []struct {
 			Extract string  `json:"extract"`
-			Ns      float64 `json:"ns"`
-			Pageid  float64 `json:"pageid"`
+			Ns      float64 `json:"-"`
+			Pageid  float64 `json:"-"`
 			Title   string  `json:"title"`
 		} `json:"pages"`
 	} `json:"query"`
@@ -32,13 +32,13 @@ type WikipediaSectionResponse struct {
 		Pageid   float64 `json:"pageid"`
 		Sections []struct {
 			Anchor     string  `json:"anchor"`
-			Byteoffset float64 `json:"byteoffset"`
-			Fromtitle  string  `json:"fromtitle"`
+			Byteoffset float64 `json:"-"`
+			Fromtitle  string  `json:"-"`
 			Index      string  `json:"index"`
 			Level      string  `json:"level"`
 			Line       string  `json:"line"`
 			Number     string  `json:"number"`
-			Toclevel   float64 `json:"toclevel"`
+			Toclevel   float64 `json:"-"`
 		} `json:"sections"`
 		Title string `json:"title"`
 	} `json:"parse"`

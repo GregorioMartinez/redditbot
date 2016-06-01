@@ -101,12 +101,11 @@ func main() {
 
 				err = postNewComment(client, commentparams)
 				if err != nil {
-					log.Printf("Error: %s", err.Error())
+					log.Printf("Error posting comment in /r/%s with parent id: %s: %s", sub, id, err.Error())
 					continue
 				}
 
 				log.Printf("Posted comment in /r/%s with parent id: %s \n", sub, id)
-
 				// Store a small cache of comments if we have space
 				if len(commented) < commentLimit {
 					commented = append(commented, id)

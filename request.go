@@ -2,11 +2,17 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 )
+
+type PostResponse struct {
+	Jquery  [][]interface{} `json:"-"`
+	Success bool            `json:"success"`
+}
 
 func redditSearchNew(client *http.Client, params map[string]interface{}) Listing {
 	resp, _ := request(client, "GET", "/r/all/comments.json", params)
@@ -17,8 +23,18 @@ func redditSearchNew(client *http.Client, params map[string]interface{}) Listing
 	return listings
 }
 
-func postNewComment(client *http.Client, params map[string]interface{}) {
-	request(client, "POST", "/api/comment", params)
+func postNewComment(client *http.Client, params map[string]interface{}) error {
+	resp, _ := request(client, "POST", "/api/comment", params)
+
+	var postResponse PostResponse
+
+	json.Unmarshal(resp, &postResponse)
+
+	if postResponse.Success == false {
+		return errors.New("Error posting comment")
+	}
+
+	return nil
 }
 
 func request(client *http.Client, method string, path string, params map[string]interface{}) ([]byte, error) {
