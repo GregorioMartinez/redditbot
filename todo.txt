@@ -1,4 +1,7 @@
+Bot not striping the []'s still
+    https://www.reddit.com/r/movies/comments/4lvus9/big_trouble_is_a_hilarious_starstudded_comedy/d3rq1ju?context=3
 Look into double posting issues
+    Appears to only occur now when cache is clearing. Do a circular cache. 
 Only reply to the article linked once per thread
 Bot should not reply if there are quotes
 Add ability for parent comment to delete bot response
