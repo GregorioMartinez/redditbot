@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"container/ring"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -25,8 +26,7 @@ func main() {
 	// Number of comments to request at once. Max 100
 	commentLimit := 100
 
-	// Used for storing comments already replied to
-	commented := make([]string, 0, commentLimit)
+	commented := ring.New(commentLimit)
 
 	// Parameters for searching comments on reddit
 	searchparams := make(map[string]interface{})
@@ -110,11 +110,8 @@ func main() {
 
 				log.Printf("Posted comment in /r/%s with parent id: %s \n", sub, id)
 				// Store a small cache of comments if we have space
-				if len(commented) < commentLimit {
-					commented = append(commented, id)
-				} else {
-					commented = make([]string, 0, 1)
-				}
+				commented = commented.Next()
+				commented.Value = id
 			}
 		}
 		time.Sleep(3 * time.Second)
@@ -148,7 +145,7 @@ func formatComment(extract string, title string, url string) (string, error) {
 	return comment, nil
 }
 
-func canPost(poster string, sub string, id string, blacklistSubs []string, blacklistUsers []string, commented []string) bool {
+func canPost(poster string, sub string, id string, blacklistSubs []string, blacklistUsers []string, commented *ring.Ring) bool {
 	// Talking to a blacklisted person
 	if contains(blacklistUsers, poster) {
 		return false
@@ -160,11 +157,23 @@ func canPost(poster string, sub string, id string, blacklistSubs []string, black
 	}
 
 	// Already comment here
-	if contains(commented, id) {
+	if ringContains(commented, id) {
 		return false
 	}
 
 	return true
+}
+
+func ringContains(r *ring.Ring, b string) bool {
+
+	fmt.Println(r.Len())
+	for i := 0; i < r.Len(); i++ {
+		if b == r.Value {
+			return true
+		}
+	}
+	return false
+
 }
 
 func contains(s []string, b string) bool {
