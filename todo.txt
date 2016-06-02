@@ -1,3 +1,5 @@
+Weird response
+    https://en.wikipedia.org/wiki/Thermal_radiation#Radiative_power
 Bot not striping the []'s still
     https://www.reddit.com/r/movies/comments/4lvus9/big_trouble_is_a_hilarious_starstudded_comedy/d3rq1ju?context=3
 Look into double posting issues
