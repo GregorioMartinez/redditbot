@@ -164,14 +164,16 @@ func canPost(poster string, sub string, id string, blacklistSubs []string, black
 	return true
 }
 
-func ringContains(r *ring.Ring, b string) bool {
-	for i := 0; i < r.Len(); i++ {
-		if b == r.Value {
-			return true
-		}
-	}
-	return false
+func ringContains(r *ring.Ring, s string) bool {
 
+	b := false
+
+	r.Do(func(x interface{}) {
+		if x == s {
+			b = true
+		}
+	})
+	return b
 }
 
 func contains(s []string, b string) bool {
