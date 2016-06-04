@@ -1,4 +1,6 @@
+n cited articles power numbers are not evaluated properly. E.g.: 1023 becomes 1023. For an example see this: https://www.reddit.com/r/space/comments/4mg8hq/universe_is_expanding_up_to_9_faster_than_we/d3viyo5
 Write tests using comment ids to test duplicate post tests
+
 Weird response
     https://en.wikipedia.org/wiki/Thermal_radiation#Radiative_power
     https://en.wikipedia.org/wiki/List_of_best-selling_video_games#All_platforms
