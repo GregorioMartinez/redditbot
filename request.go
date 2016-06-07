@@ -15,7 +15,7 @@ type PostResponse struct {
 }
 
 func redditSearchNew(client *http.Client, params map[string]interface{}) Listing {
-	resp, _ := request(client, "GET", "/r/all/comments.json", params)
+	resp, _ := request(client, "GET", "/r/personalbotplayground/comments.json", params)
 
 	var listings Listing
 	json.Unmarshal(resp, &listings)
@@ -23,7 +23,35 @@ func redditSearchNew(client *http.Client, params map[string]interface{}) Listing
 	return listings
 }
 
+func deleteComment(client *http.Client, params map[string]interface{}) {
+	_, err := request(client, "POST", "/api/del", params)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// Handle error better
+func getUnreadMsgs(client *http.Client) (Messages, error) {
+	resp, _ := request(client, "GET", "/message/unread", nil)
+
+	var msgs Messages
+
+	err := json.Unmarshal(resp, &msgs)
+
+	return msgs, err
+}
+
+func setMsgRead(client *http.Client, params map[string]interface{}) {
+	_, err := request(client, "POST", "/api/read_message", params)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func postNewComment(client *http.Client, params map[string]interface{}) error {
+
+	fmt.Println(params)
+
 	resp, _ := request(client, "POST", "/api/comment", params)
 
 	var postResponse PostResponse
@@ -52,6 +80,8 @@ func request(client *http.Client, method string, path string, params map[string]
 	}
 
 	req.Header.Set("User-Agent", "User-Agent: wikipediaposterbot:v0.0.3 (by /u/WikipediaPoster)")
+
+	fmt.Println(req.URL.String())
 
 	resp, err := client.Do(req)
 	if err != nil {

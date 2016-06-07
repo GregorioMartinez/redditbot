@@ -35,8 +35,29 @@ func main() {
 	//Wikipedia API endpoint
 	wikilink := "https://%s.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro&explaintext&formatversion=2&titles=%s"
 
+	msgs, err := getUnreadMsgs(client)
+	if err != nil {
+		panic(err)
+	}
+
+	// Read all unread messages.
+	for _, msg := range msgs.Data.Children {
+		// If the message was a comment and the comment said Delete then remove it.
+		if msg.Data.WasComment && msg.Data.Body == "Delete" {
+			delparams := make(map[string]interface{})
+			delparams["id"] = msg.Data.ParentID
+			deleteComment(client, delparams)
+		}
+
+		msgparams := make(map[string]interface{})
+		msgparams["id"] = fmt.Sprintf("t1_%s", msg.Data.ID)
+		// Mark as read
+		setMsgRead(client, msgparams)
+	}
+
 	// Run
 	for {
+
 		// Get new comments from /r/all
 		listings := redditSearchNew(client, searchparams)
 
