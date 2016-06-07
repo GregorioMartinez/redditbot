@@ -16,3 +16,7 @@ Update to better logging
 Can you make it so it won't respond to the same article every time it's brought up in a thread?
 Add section name as part of link in comment
 Add way for users to add themselves to blacklist
+Is there a way to prevent the bot commenting on the same link multiple times in a thread? Kinda feels unnecessary to have it keep replying
+example
+Guy posts the same link a few times and the bot kept responding, seems a little spammy
+Make a subreddit instead of giving username. This will cutdown on duplicate stuff 
