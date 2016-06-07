@@ -23,7 +23,7 @@ func getClient(s string) *http.Client {
 	conf := &oauth2.Config{
 		ClientID:     ClientID,
 		ClientSecret: ClientSecret,
-		Scopes:       []string{"read", "identity", "submit"},
+		Scopes:       []string{"read", "identity", "submit", "privatemessages", "edit"},
 		Endpoint: oauth2.Endpoint{
 			AuthURL:  "https://www.reddit.com/api/v1/authorize",
 			TokenURL: "https://www.reddit.com/api/v1/access_token",
