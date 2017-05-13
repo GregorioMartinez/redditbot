@@ -1,21 +1,18 @@
 package main
 
 import (
-	"bytes"
 	"container/ring"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"sort"
-	//"strconv"
 	"strings"
 	"database/sql"
-
-	_ "github.com/mattn/go-sqlite3"
 	"time"
 	"strconv"
 	"net/http"
+
+	_ "github.com/mattn/go-sqlite3"
+
 )
 
 func main() {
