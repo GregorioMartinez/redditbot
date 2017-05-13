@@ -8,52 +8,81 @@ import (
 	"io/ioutil"
 	"log"
 	"sort"
-	"strconv"
+	//"strconv"
 	"strings"
+	"database/sql"
+
+	_ "github.com/mattn/go-sqlite3"
 	"time"
+	"strconv"
+	"net/http"
 )
 
 func main() {
-	// Load blacklists
-	blacklistSubs, blacklistUsers := getBlacklist("subs.txt"), getBlacklist("users.txt")
 
-	log.Printf("Blacklisted Subs: %v \n", blacklistSubs)
-	log.Printf("Blacklisted Users: %v \n", blacklistUsers)
-
-	// Get the client for making requests
-	client := getClient("reddit-wikipediaposter-config.json")
-
-	// Number of comments to request at once. Max 100
-	commentLimit := 100
-
-	commented := ring.New(commentLimit)
-
-	// Parameters for searching comments on reddit
-	searchparams := make(map[string]interface{})
-	searchparams["limit"] = commentLimit
-
-	//Wikipedia API endpoint
-	wikilink := "https://%s.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro&explaintext&formatversion=2&titles=%s"
-
-	msgs, err := getUnreadMsgs(client)
+	// Open DB connection
+	db, err := sql.Open("sqlite3", "./wikibot.db")
 	if err != nil {
 		panic(err)
 	}
 
-	// Read all unread messages.
-	for _, msg := range msgs.Data.Children {
-		// If the message was a comment and the comment said Delete then remove it.
-		if msg.Data.WasComment && msg.Data.Body == "Delete" {
-			delparams := make(map[string]interface{})
-			delparams["id"] = msg.Data.ParentID
-			deleteComment(client, delparams)
+	// Make sure table exists
+	statement, err := db.Prepare("CREATE TABLE IF NOT EXISTS \"blacklist\" (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT, datetime INTEGER, reddit_id TEXT, comment_id TEXT)")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	_, err = statement.Exec()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Check if DB has bot already in it
+	q, err := db.Query("SELECT COUNT(*) FROM blacklist WHERE reddit_id = ?", "xurih")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer q.Close()
+
+	var count int
+	for q.Next() {
+		err = q.Scan(&count)
+	}
+
+	// If bot user isn't there then seed the db
+	if count == 0 {
+		// populate
+		seedStatement, err := db.Prepare("INSERT INTO blacklist (name, type, datetime, reddit_id) VALUES(?, ?, ?, ?)")
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		msgparams := make(map[string]interface{})
-		msgparams["id"] = fmt.Sprintf("t1_%s", msg.Data.ID)
-		// Mark as read
-		setMsgRead(client, msgparams)
+		//@TODO This should actually make a request to me.json to pull this info dynamically
+		now := time.Now()
+		_, err = seedStatement.Exec("WikipediaPoster", "user", now.Unix(), "xurih")
+		if err != nil {
+			panic(err)
+		}
+
+		log.Println("Seeded database with bot user")
+
 	}
+
+	// Number of comments to request at once. Max 100
+	commentLimit := 100
+	// Store posted comments so do not comment twice
+	commented := ring.New(commentLimit)
+	searchparams := make(map[string]interface{})
+	searchparams["limit"] = commentLimit
+
+	client := getClient("reddit-wikipediaposter-config.json")
+
+	//@TODO
+	// Delete any comments users replied Please deleteto
+	// Block any users who replied Please do not reply to me
+
+	//replyChan := make(chan string)
+	wikilink := "https://%s.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro&explaintext&formatversion=2&titles=%s"
 
 	// Run
 	for {
@@ -63,9 +92,8 @@ func main() {
 
 		for _, listing := range listings.Data.Children {
 
-			poster, sub, id := strings.ToLower(listing.Data.Author), strings.ToLower(listing.Data.Subreddit), listing.Data.Name
-
-			if !canPost(poster, sub, id, blacklistSubs, blacklistUsers, commented) {
+			poster, sub, id := listing.Data.Author, listing.Data.Subreddit, listing.Data.Name
+			if !canPost(poster, sub, id, commented, db) {
 				continue
 			}
 
@@ -123,11 +151,11 @@ func main() {
 				commentparams["text"] = comment
 				commentparams["parent"] = id
 
-				err = postNewComment(client, commentparams)
-				if err != nil {
-					log.Printf("Error posting comment in /r/%s with parent id: %s: %s", sub, id, err.Error())
-					continue
-				}
+				//err = postNewComment(client, commentparams)
+				//if err != nil {
+				//	log.Printf("Error posting comment in /r/%s with parent id: %s: %s", sub, id, err.Error())
+				//	continue
+				//}
 
 				log.Printf("Posted comment in /r/%s with parent id: %s \n", sub, id)
 				// Store a small cache of comments if we have space
@@ -136,6 +164,30 @@ func main() {
 			}
 		}
 		time.Sleep(3 * time.Second)
+	}
+
+}
+
+func readMessages(client *http.Client){
+	msgs, err := getUnreadMsgs(client)
+	if err != nil {
+		log.Printf(err.Error())
+		log.Fatal("Error reading messages")
+	}
+
+	// Read all unread messages.
+	for _, msg := range msgs.Data.Children {
+		// If the message was a comment and the comment said Delete then remove it.
+		if msg.Data.WasComment && msg.Data.Body == "Delete" {
+			delparams := make(map[string]interface{})
+			delparams["id"] = msg.Data.ParentID
+			deleteComment(client, delparams)
+		}
+
+		msgparams := make(map[string]interface{})
+		msgparams["id"] = fmt.Sprintf("t1_%s", msg.Data.ID)
+		// Mark as read
+		setMsgRead(client, msgparams)
 	}
 }
 
@@ -166,19 +218,28 @@ func formatComment(extract string, title string, url string) (string, error) {
 	return comment, nil
 }
 
-func canPost(poster string, sub string, id string, blacklistSubs []string, blacklistUsers []string, commented *ring.Ring) bool {
-	// Talking to a blacklisted person
-	if contains(blacklistUsers, poster) {
-		return false
+func canPost(poster string, sub string, id string, commented *ring.Ring, db *sql.DB) bool {
+
+	var count int
+	q, err := db.Query("SELECT COUNT(*) FROM blacklist WHERE (LOWER(name) = LOWER(?) AND type = \"user\") OR  (LOWER(name) = LOWER(?) AND type = \"subreddit\")", poster, sub)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// Talking in a blacklisted sub
-	if contains(blacklistSubs, sub) {
+	defer q.Close()
+
+	for q.Next() {
+		err = q.Scan(&count)
+	}
+
+	if count != 0 {
+		log.Printf("Blocked from responding to /u/%s or /r/%s \n", poster, sub)
 		return false
 	}
 
 	// Already comment here
 	if ringContains(commented, id) {
+		log.Printf("Already replied to comment: %s \n", id)
 		return false
 	}
 
@@ -195,27 +256,4 @@ func ringContains(r *ring.Ring, s string) bool {
 		}
 	})
 	return b
-}
-
-func contains(s []string, b string) bool {
-	sort.Strings(s)
-
-	i := sort.SearchStrings(s, b)
-
-	if i >= len(s) || s[i] != b {
-		return false
-	}
-	return true
-}
-
-func getBlacklist(filename string) []string {
-	contents, err := ioutil.ReadFile(filename)
-	if err != nil {
-		log.Fatalf("Unable to read blacklist %s", filename)
-	}
-
-	b := bytes.ToLower(contents)
-	s := string(b[:])
-
-	return strings.Split(s, "\n")
 }

@@ -32,11 +32,14 @@ func deleteComment(client *http.Client, params map[string]interface{}) {
 
 // Handle error better
 func getUnreadMsgs(client *http.Client) (Messages, error) {
-	resp, _ := request(client, "GET", "/message/unread", nil)
-
 	var msgs Messages
 
-	err := json.Unmarshal(resp, &msgs)
+	resp, err := request(client, "GET", "/message/unread", nil)
+	if err != nil {
+		return msgs, err
+	}
+
+	err = json.Unmarshal(resp, &msgs)
 
 	return msgs, err
 }
@@ -81,8 +84,6 @@ func request(client *http.Client, method string, path string, params map[string]
 
 	req.Header.Set("User-Agent", "User-Agent: wikipediaposterbot:v0.0.3 (by /u/WikipediaPoster)")
 
-	fmt.Println(req.URL.String())
-
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
@@ -94,6 +95,8 @@ func request(client *http.Client, method string, path string, params map[string]
 	if err != nil {
 		panic(err)
 	}
+
+	//fmt.Printf("%s, \n", body)
 
 	return body, nil
 }
