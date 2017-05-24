@@ -19,8 +19,13 @@ import (
 
 func main() {
 
-	//@TODO Split these into parts that make sense
-	db := NewDatabase()
+	db, err := sql.Open("sqlite3", "./wikibot.db")
+	if err != nil {
+		panic(err)
+	}
+
+	// Set up tables and seed
+	seedDatabase(db)
 
 	// Limit to one event every two seconds
 	// With a max of 3 events at once
@@ -31,8 +36,8 @@ func main() {
 	commentLimit := 100
 	// Store posted comments so do not comment twice
 	commented := ring.New(commentLimit)
-	searchparams := make(map[string]interface{})
-	searchparams["limit"] = commentLimit
+	searchParams := make(map[string]interface{})
+	searchParams["limit"] = commentLimit
 
 	client := getClient("reddit-wikipediaposter-config.json")
 
@@ -98,7 +103,7 @@ func main() {
 				go func() {
 					log.Println("Searching for new comments")
 					// Get new comments from /r/all
-					listingChan <- redditSearchNew(client, searchparams)
+					listingChan <- redditSearchNew(client, searchParams)
 				}()
 			}
 	}
@@ -219,7 +224,7 @@ func formatComment(extract string, title string, url string) (string, error) {
 func canPost(poster string, sub string, id string, commented *ring.Ring, db *sql.DB) bool {
 
 	var count int
-	q, err := db.Query("SELECT COUNT(*) FROM blacklist WHERE (LOWER(name) = LOWER(?) AND type = \"user\") OR  (LOWER(name) = LOWER(?) AND type = \"subreddit\")", poster, sub)
+	q, err := db.Query("SELECT COUNT(*) FROM blacklist WHERE (LOWER(blacklist.name) = LOWER(?) AND blacklist.type = 'user') OR (LOWER(blacklist.name) = LOWER(?) AND blacklist.type = 'subreddit')", poster, sub)
 	if err != nil {
 		log.Fatal(err)
 	}

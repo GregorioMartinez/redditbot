@@ -6,13 +6,7 @@ import (
 	"log"
 )
 
-func NewDatabase() *sql.DB{
-	// Open DB connection
-	db, err := sql.Open("sqlite3", "./wikibot.db")
-	if err != nil {
-		panic(err)
-	}
-
+func seedDatabase(db *sql.DB) {
 	// Make sure table exists
 	statement, err := db.Prepare("CREATE TABLE IF NOT EXISTS \"blacklist\" (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT, datetime INTEGER, reddit_id TEXT, comment_id TEXT)")
 	if err != nil {
@@ -25,6 +19,7 @@ func NewDatabase() *sql.DB{
 	}
 
 	// Check if DB has bot already in it
+	// Grab ID from a request so that we can seed it properly
 	q, err := db.Query("SELECT COUNT(*) FROM blacklist WHERE reddit_id = ?", "xurih")
 	if err != nil {
 		log.Fatal(err)
