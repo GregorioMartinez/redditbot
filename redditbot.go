@@ -28,9 +28,9 @@ func main() {
 	seedDatabase(db)
 
 	// Limit to one event every two seconds
-	// With a max of 3 events at once
+	// With a max of 2 events at once
 	limit := rate.Every(time.Second * 2)
-	limiter := rate.NewLimiter(limit, 3)
+	limiter := rate.NewLimiter(limit, 2)
 
 	// Number of comments to request at once. Max 100
 	commentLimit := 100
@@ -40,10 +40,6 @@ func main() {
 	searchParams["limit"] = commentLimit
 
 	client := getClient("reddit-wikipediaposter-config.json")
-
-	//@TODO
-	// Delete any comments users replied Please deleteto
-	// Block any users who replied Please do not reply to me
 
 	//replyChan := make(chan string)
 	wikilink := "https://%s.wikipedia.org/w/api.php?format=json&action=query&prop=extracts&exintro&explaintext&formatversion=2&titles=%s"
@@ -63,7 +59,7 @@ func main() {
 		select {
 			case <-tickChan :
 				log.Println("Reading Messages")
-				readMessages(client)
+				readMessages(client, db)
 			case listings := <-listingChan:
 				log.Println("Checking new comments for Wikipedia links")
 				for _, listing := range listings.Data.Children {
@@ -87,7 +83,7 @@ func main() {
 							continue
 						}
 
-						err = postComment(comment, id)
+						err = postComment(comment, id,sub, client)
 						if err != nil {
 							panic(err)
 						}
@@ -156,22 +152,20 @@ func getComment(section string, lang string, query string, wikilink string) (str
 	return extract, title, nil
 }
 
-//@TODO fix errors here
-func postComment(comment string, id string) error {
+func postComment(comment string, id string, sub string, client *http.Client) error {
 	commentParams := make(map[string]interface{})
 	commentParams["text"] = comment
 	commentParams["parent"] = id
 
-	//err = postNewComment(client, commentParams)
-	//if err != nil {
-	//	log.Printf("Error posting comment in /r/%s with parent id: %s: %s", sub, id, err.Error())
-	//	continue
-	//}
+	err := postNewComment(client, commentParams)
+	if err != nil {
+		log.Printf("Error posting comment in /r/%s with parent id: %s: %s", sub, id, err.Error())
+	}
 
-	return nil
+	return err
 }
 
-func readMessages(client *http.Client) {
+func readMessages(client *http.Client, db *sql.DB) {
 	msgs, err := getUnreadMsgs(client)
 	if err != nil {
 		log.Printf(err.Error())
@@ -181,10 +175,24 @@ func readMessages(client *http.Client) {
 	// Read all unread messages.
 	for _, msg := range msgs.Data.Children {
 		// If the message was a comment and the comment said Delete then remove it.
-		if msg.Data.WasComment && msg.Data.Body == "Delete" {
+		if msg.Data.WasComment && strings.TrimSpace(strings.ToLower(msg.Data.Body)) == "!delete" {
 			delparams := make(map[string]interface{})
 			delparams["id"] = msg.Data.ParentID
 			deleteComment(client, delparams)
+		}
+
+		if msg.Data.WasComment && strings.TrimSpace(strings.ToLower(msg.Data.Body)) == "!block" {
+			// 		seedStatement, err := db.Prepare("INSERT INTO blacklist (name, type, datetime, reddit_id) VALUES(?, ?, ?, ?)")
+
+			statement, err := db.Prepare("INSERT INTO blacklist (name, type, reddit_id, comment_id) VALUES(?, ?, ?, ?)")
+			if err != nil {
+				log.Println("Failed to enter user into blacklist", err)
+			}
+
+			name := strings.ToLower(msg.Data.Author)
+
+			//@TODO Get user id. Need to make request to /u/name/about.json
+			statement.Exec(name, "user", null, msg.Data.ID)
 		}
 
 		msgparams := make(map[string]interface{})
